@@ -6,5 +6,7 @@ import (
 
 func main(){
 	controllers.CreateSeed()
-	controllers.CreatePeer("127.0.0.1", 8080)
+	go controllers.CreatePeer("127.0.0.1", 8000)
+	go controllers.CreatePeer("127.0.0.1", 8001)
+	go controllers.CreatePeer("127.0.0.1", 8002)
 }
