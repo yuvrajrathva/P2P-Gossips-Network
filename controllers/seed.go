@@ -3,6 +3,7 @@ package controllers
 import (
 	"fmt"
 	"log"
+	"sync"
 
 	"github.com/spf13/viper"
 	"github.com/yuvrajrathva/P2P-Gossips-Network/models"
@@ -24,6 +25,7 @@ func CreateSeed() {
 		log.Fatalf("Error parsing seed nodes: %s", err)
 	}
 
+	callTCPServer(seedNodes)
 	// Print the seed nodes
 	fmt.Println("Seed Nodes:")
 	printSeedNodes(seedNodes)
@@ -51,11 +53,26 @@ func printSeedNodes(seedNodes []models.ConfigSeed) {
 }
 
 func getSeedNodes() ([]models.ConfigSeed, error) {
-	// Parse the seed nodes from the configuration file
-	seedNodes, err := parseSeedNodes()
-	if err != nil {
-		return nil, fmt.Errorf("error parsing seed nodes: %s", err)
+	type Config struct{
+		Seeds []models.ConfigSeed
 	}
 
-	return seedNodes, nil
+	var config Config
+
+	// Unmarshal the configuration file into the Config structure
+	if err := viper.Unmarshal(&config); err != nil {
+		return nil, fmt.Errorf("error unmarshalling config: %s", err)
+	}
+
+	return config.Seeds, nil
+}
+
+func callTCPServer(seedNodes []models.ConfigSeed){
+	var wg sync.WaitGroup
+	wg.Add(len(seedNodes))
+	fmt.Println("Starting Seed Nodes as Server")
+	for _, seed := range seedNodes {
+		go TCPServer(seed.IP, seed.Port, &wg)
+	}
+	wg.Wait()
 }
