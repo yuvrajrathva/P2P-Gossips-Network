@@ -13,7 +13,7 @@ func CreateSeed() {
 	// Initialize Viper for config file
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml") 
-	viper.AddConfigPath(".")   
+	viper.AddConfigPath("../../config")   
 
 	if err := viper.ReadInConfig(); err != nil {
 		log.Fatalf("Error reading config file: %s", err)
@@ -27,8 +27,8 @@ func CreateSeed() {
 
 	callTCPServer(seedNodes)
 	// Print the seed nodes
-	fmt.Println("Seed Nodes:")
-	printSeedNodes(seedNodes)
+	// fmt.Println("Seed Nodes:")
+	// printSeedNodes(seedNodes)
 }
 
 func parseSeedNodes() ([]models.ConfigSeed, error) {
@@ -48,11 +48,20 @@ func parseSeedNodes() ([]models.ConfigSeed, error) {
 
 func printSeedNodes(seedNodes []models.ConfigSeed) {
 	for _, seed := range seedNodes {
-		fmt.Printf("IP: %s, Port: %d, Peer List: %v\n", seed.IP, seed.Port, seed.PeerList)
+		fmt.Printf("IP: %s, Port: %d \n", seed.IP, seed.Port)
 	}
 }
 
 func getSeedNodes() ([]models.ConfigSeed, error) {
+	// Initialize Viper for config file
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml") 
+	viper.AddConfigPath("../../config")   
+
+	if err := viper.ReadInConfig(); err != nil {
+		log.Fatalf("Error reading config file: %s", err)
+	}
+
 	type Config struct{
 		Seeds []models.ConfigSeed
 	}
@@ -72,7 +81,7 @@ func callTCPServer(seedNodes []models.ConfigSeed){
 	wg.Add(len(seedNodes))
 	fmt.Println("Starting Seed Nodes as Server")
 	for _, seed := range seedNodes {
-		go TCPServer(seed.IP, seed.Port, &wg)
+		go SeedTCPServer(seed.IP, seed.Port, &wg, &seed.PeerList)
 	}
 	wg.Wait()
 }
