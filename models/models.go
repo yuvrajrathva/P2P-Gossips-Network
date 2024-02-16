@@ -9,4 +9,5 @@ type ConfigSeed struct {
 type Peer struct {
 	IP   string
 	Port int
+	MissedPings int 
 }

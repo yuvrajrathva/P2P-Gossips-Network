@@ -23,13 +23,13 @@ func CreatePeer(ip string, port int) {
 	fmt.Println("Number of total Seed Nodes:", len(seedNodeList))
 
 	selectedSeedNodes := selectSeedNodes(seedNodeList) // select n/2 + 1 seed nodes
-	fmt.Println("List of Seed Nodes for this Peer:")
-	printSeedNodes(selectedSeedNodes)
+	// fmt.Println("List of Seed Nodes for this Peer:")
+	// printSeedNodes(selectedSeedNodes)
 
 	// var selectedPeers []models.Peer
 	selectedPeersList := selectPeersList(selectedSeedNodes) // select all peers from selected seed nodes
 	selectedPeers := selectPeers(selectedPeersList)         // select 4 peers from selected peers list
-	// addPeerToSeedNodes(selectedSeedNodes, peer)             // add this peer to Peer List of selected seed nodes
+	printPeerNodes(selectedPeers)
 
 	if len(selectedPeers) > 0 {
 		connectToPeersServer(selectedPeers) // connect to selected peers
@@ -38,7 +38,7 @@ func CreatePeer(ip string, port int) {
 	addPeerToSeedNodes(selectedSeedNodes, peer) // add this peer to Peer List of selected seed nodes
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go PeerTCPServer(ip, port, &wg) // start server
+	go PeerTCPServer(ip, port, &wg, &selectedPeers) // start server
 	wg.Wait()
 	fmt.Printf("Peer created - IP: %s, Port: %d\n", peer.IP, peer.Port)
 }
@@ -84,7 +84,6 @@ func containsPeer(peers []models.Peer, peer models.Peer) bool {
 			return true
 		}
 	}
-
 	return false
 }
 
@@ -134,3 +133,9 @@ func connectToPeersServer(peers []models.Peer) {
 // 		fmt.Printf("IP: %s, Port: %d, Peer List: %v\n", peer.IP, peer.Port)
 // 	}
 // }
+
+func printPeerNodes(peerNodes []models.Peer) {
+	for _, peer := range peerNodes {
+		fmt.Printf("Selected Peer IP: %s, Port: %d\n", peer.IP, peer.Port)
+	}
+}
