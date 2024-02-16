@@ -77,7 +77,7 @@ func PeerTCPServer(ip string, port int, wg *sync.WaitGroup, peerList *[]models.P
 			var wg sync.WaitGroup
 			for _, peer := range *peerList {
 				wg.Add(1)
-				go PeerLivelinessChecker(ip, port, peer.IP, peer.Port, &wg, &peer.MissedPings)
+				go PeerLivelinessChecker(ip, port, peer.IP, peer.Port, &wg, &peer.MissedPings, peerList)
 			}
 			wg.Wait()
 			time.Sleep(13 * time.Second)
@@ -146,6 +146,22 @@ func handleSeedServerConnection(conn net.Conn, peerList *[]models.Peer) {
 			fmt.Println("Error while sending peer list: ", err.Error())
 			return
 		}
+	} else if stringToArray(string(buffer[:n]), ":")[0] == "removePeer" {
+		deadIP := stringToArray(string(buffer[:n]), ":")[1]
+		deadPort, _ := strconv.Atoi(stringToArray(string(buffer[:n]), ":")[2])
+
+		for i, peer := range *peerList {
+			if peer.IP == deadIP && peer.Port == deadPort {
+				*peerList = append((*peerList)[:i], (*peerList)[i+1:]...)
+				fmt.Printf("Dead Node: %s:%d:%s:%s\n", deadIP, deadPort, time.Now().String(), conn.LocalAddr().(*net.TCPAddr).IP.String())
+				break
+			}
+		}
+		_, err = conn.Write([]byte("inValidRequest"))
+		if err != nil {
+			fmt.Println("Error while sending invalid request message: ", err.Error())
+			return
+		}
 	} else {
 		peer := stringToArray(string(buffer[:n]), ":")
 		ip := peer[0]
@@ -156,8 +172,6 @@ func handleSeedServerConnection(conn net.Conn, peerList *[]models.Peer) {
 		}
 		*peerList = append(*peerList, models.Peer{IP: ip, Port: port})
 		fmt.Printf("Peer added - IP: %s, Port: %d to Seed: %s \n", ip, port, conn.LocalAddr().(*net.TCPAddr))
-
-		// getPeerListFromSeeds()
 	}
 }
 
@@ -221,21 +235,22 @@ func handlePeerServerConnection(conn net.Conn, ip string) {
 	}
 }
 
-func PeerLivelinessChecker(selfIP string, selfPort int, ip string, port int, wg *sync.WaitGroup, missedPings *int) {
+func PeerLivelinessChecker(selfIP string, selfPort int, ip string, port int, wg *sync.WaitGroup, missedPings *int, peerList *[]models.Peer) {
 	// detect dead peers and remove that peer node from seed if missedPings >= 3
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", ip, port))
 	if err != nil {
 		*missedPings = *missedPings + 1
 		if *missedPings >= 3 {
 			fmt.Printf("Peer is dead - IP: %s, Port: %d\n", ip, port)
-			removePeerFromSeedNodes(ip, port)
+			removePeerFromSeedNodes(selfIP, selfPort, ip, port, peerList)
 		}
 
 		fmt.Printf("Error connecting to peer - IP: %s, Port: %d, Missed Pings: %d, Error: %s\n", ip, port, *missedPings, err)
+		removePeerFromSeedNodes(selfIP, selfPort, ip, port, peerList)
 	} else {
 		defer conn.Close()
 
-		_, err = conn.Write([]byte(time.Now().String() + ":" + selfIP + "\n"))
+		_, err = conn.Write([]byte(time.Now().String() + ":" + selfIP))
 		if err != nil {
 			fmt.Println("Error while sending liveness message: ", err.Error())
 			return
@@ -251,7 +266,7 @@ func PeerLivelinessChecker(selfIP string, selfPort int, ip string, port int, wg 
 
 		if n == 0 {
 			fmt.Printf("Peer is dead - IP: %s, Port: %d\n", ip, port)
-			removePeerFromSeedNodes(ip, port)
+			removePeerFromSeedNodes(selfIP, selfPort, ip, port, peerList)
 			return
 		}
 		*missedPings = 0
@@ -260,7 +275,7 @@ func PeerLivelinessChecker(selfIP string, selfPort int, ip string, port int, wg 
 	defer wg.Done()
 }
 
-func removePeerFromSeedNodes(ip string, port int) {
+func removePeerFromSeedNodes(selfIP string, selfPort int, ip string, port int, peerList *[]models.Peer) {
 	seedNodeList, err := getSeedNodes()
 	if err != nil {
 		fmt.Printf("Error getting seed nodes: %s\n", err)
@@ -268,12 +283,36 @@ func removePeerFromSeedNodes(ip string, port int) {
 	}
 
 	for _, seed := range seedNodeList {
-		for i, peer := range seed.PeerList {
-			if peer.IP == ip && peer.Port == port {
-				seed.PeerList = append(seed.PeerList[:i], seed.PeerList[i+1:]...)
-				break
-			}
+		conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", seed.IP, seed.Port))
+		if err != nil {
+			fmt.Printf("Error connecting to seed server - IP: %s, Port: %d, Error: %s\n", seed.IP, seed.Port, err)
+			return
+		}
+		defer conn.Close()
+
+		_, err = conn.Write([]byte("removePeer:" + ip + ":" + strconv.Itoa(port)))
+		if err != nil {
+			fmt.Println("Error while sending remove peer message:", err)
+			return
+		}
+
+		buffer := make([]byte, 1024)
+
+		n, err := conn.Read(buffer)
+		if err != nil {
+			fmt.Println("Error while reading remove peer message:", err)
+			return
+		}
+
+		if string(buffer[:n]) != "inValidRequest" {
+			fmt.Printf("Dead Node: %s:%d:%s:%s\n", ip, port, time.Now().String(), selfIP)
 		}
 	}
 
+	for i, peer := range *peerList {
+		if peer.IP == ip && peer.Port == port {
+			*peerList = append((*peerList)[:i], (*peerList)[i+1:]...)
+			break
+		}
+	}
 }

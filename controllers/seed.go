@@ -46,11 +46,11 @@ func parseSeedNodes() ([]models.ConfigSeed, error) {
 	return config.Seeds, nil
 }
 
-func printSeedNodes(seedNodes []models.ConfigSeed) {
-	for _, seed := range seedNodes {
-		fmt.Printf("IP: %s, Port: %d \n", seed.IP, seed.Port)
-	}
-}
+// func printSeedNodes(seedNodes []models.ConfigSeed) {
+// 	for _, seed := range seedNodes {
+// 		fmt.Printf("IP: %s, Port: %d \n", seed.IP, seed.Port)
+// 	}
+// }
 
 func getSeedNodes() ([]models.ConfigSeed, error) {
 	// Initialize Viper for config file
