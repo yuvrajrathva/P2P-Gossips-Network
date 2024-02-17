@@ -14,7 +14,7 @@ go version
 
 
 ## Folder Structure 
-There are 4 folders in the root directory and 4 files. There is one config folder which contains config.yaml file and there we have specifid the seed port and the ip address. 
+There are 4 folders in the root directory and 4 files. There is one config folder which contains config.txt file and there we have specified the seed port and the ip address. 
 To run the seed nodes follow the below path:
 
 1) Go the cmd folder from the root directory
