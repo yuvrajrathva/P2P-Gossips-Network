@@ -81,7 +81,7 @@ func selectPeersList(seedNodes []models.ConfigSeed) []models.Peer {
 
 func containsPeer(peers []models.Peer, peer models.Peer) bool {
 	for _, p := range peers {
-		if p == peer {
+		if p.IP == peer.IP && p.Port == peer.Port {
 			return true
 		}
 	}

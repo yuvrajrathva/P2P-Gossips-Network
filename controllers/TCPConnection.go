@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"net"
 	"os"
@@ -83,6 +84,17 @@ func PeerTCPServer(ip string, port int, wg *sync.WaitGroup, peerList *[]models.P
 			wg.Wait()
 			time.Sleep(13 * time.Second)
 		}
+	}()
+
+	go func() {
+		// 	Every gossip message received the first time should be displayed on the console as well as written to the output file along with a local timestamp and the IP address of the node from which it received the message.
+		var wg sync.WaitGroup
+		for _, peer := range *peerList {
+			wg.Add(1)
+			go GossipMessage(peer.IP, peer.Port, ip, port, &wg)
+		}
+		wg.Wait()
+		time.Sleep(5 * time.Second)
 	}()
 
 	for {
@@ -216,13 +228,30 @@ func handlePeerServerConnection(conn net.Conn, ip string) {
 		return
 	}
 
-	senderTimestamp := stringToArray(string(buffer[:n]), ":")[0]
-	senderIP := stringToArray(string(buffer[:n]), ":")[1]
+	if stringToArray(string(buffer[:n]), " : ")[0] == "GossipMessage" {
+		// Every gossip message received the first time should be displayed on the console as well as written to the output file along with a local timestamp and the IP address of the node from which it received the message.
+		messageTimeStamp := stringToArray(string(buffer[:n]), " : ")[1]
+		senderIP := stringToArray(string(buffer[:n]), " : ")[2]
+		senderPort:=stringToArray(string(buffer[:n]), " : ")[3]
+		messageHash := stringToArray(string(buffer[:n]), " : ")[4]
 
-	_, err = conn.Write([]byte(senderTimestamp + ":" + senderIP + ":" + ip + ":\n"))
-	if err != nil {
-		fmt.Println("Error while sending liveness message: ", err.Error())
-		return
+		outputfile, err := os.OpenFile("../../outputfile.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			fmt.Println("Error opening output file: ", err.Error())
+			return
+		}
+		defer outputfile.Close()
+		fmt.Printf("Gossip Message Received: %s : %s : %s\n", messageTimeStamp, senderIP+":"+senderPort, messageHash)
+		outputfile.WriteString(fmt.Sprintf("Gossip Message Received: %s : %s : %s\n", messageTimeStamp, senderIP+":"+senderPort, messageHash))
+	} else {
+		senderTimestamp := stringToArray(string(buffer[:n]), ":")[1]
+		senderIP := stringToArray(string(buffer[:n]), ":")[2]
+
+		_, err = conn.Write([]byte(senderTimestamp + ":" + senderIP + ":" + ip + ":\n"))
+		if err != nil {
+			fmt.Println("Error while sending liveness message: ", err.Error())
+			return
+		}
 	}
 }
 
@@ -241,7 +270,7 @@ func PeerLivelinessChecker(selfIP string, selfPort int, ip string, port int, wg 
 	} else {
 		defer conn.Close()
 
-		_, err = conn.Write([]byte(time.Now().String() + ":" + selfIP))
+		_, err = conn.Write([]byte("LivenessMessage:" + time.Now().String() + ":" + selfIP))
 		if err != nil {
 			fmt.Println("Error while sending liveness message: ", err.Error())
 			return
@@ -287,7 +316,7 @@ func removePeerFromSeedNodes(selfIP string, selfPort int, ip string, port int, p
 			return
 		}
 	}
-	
+
 	outputfile, err := os.OpenFile("../../outputfile.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		fmt.Println("Error opening output file: ", err.Error())
@@ -304,4 +333,26 @@ func removePeerFromSeedNodes(selfIP string, selfPort int, ip string, port int, p
 			break
 		}
 	}
+}
+
+func GossipMessage(peerIP string, peerPort int, selfIP string, selfPort int, wg *sync.WaitGroup) {
+	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", peerIP, peerPort))
+	if err != nil {
+		fmt.Printf("Error connecting to peer for gossip message- IP: %s, Port: %d, Error: %s\n", peerIP, peerPort, err)
+		return
+	}
+	defer conn.Close()
+
+	Message := "Gossip Message"
+	hash := sha256.New()
+	hash.Write([]byte(Message))
+	hashedMessage := hash.Sum(nil)
+
+	_, err = conn.Write([]byte("GossipMessage : " + time.Now().String() + " : " + selfIP + " : " + strconv.Itoa(selfPort) + " : " + string(hashedMessage)))
+	if err != nil {
+		fmt.Println("Error while sending gossip message:", err)
+		return
+	}
+
+	defer wg.Done()
 }
