@@ -4,31 +4,28 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"os"
+	"bufio"
+	"strings"
+	"strconv"
 
-	"github.com/spf13/viper"
 	"github.com/yuvrajrathva/P2P-Gossips-Network/models"
 )
 
 func CreateSeed() {
-	// Initialize Viper for config file
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml") 
-	viper.AddConfigPath("../../config")   
-
-	if err := viper.ReadInConfig(); err != nil {
-		log.Fatalf("Error reading config file: %s", err)
-	}
-
 	// Parse the seed nodes from the configuration file
+	outputFile, err := os.Create("../../outputfile.txt")
+	if err != nil {
+		log.Fatalf("Error creating output file: %s", err)
+	}
+	defer outputFile.Close()
+
 	seedNodes, err := parseSeedNodes()
 	if err != nil {
 		log.Fatalf("Error parsing seed nodes: %s", err)
 	}
 
 	callTCPServer(seedNodes)
-	// Print the seed nodes
-	// fmt.Println("Seed Nodes:")
-	// printSeedNodes(seedNodes)
 }
 
 func parseSeedNodes() ([]models.ConfigSeed, error) {
@@ -38,42 +35,42 @@ func parseSeedNodes() ([]models.ConfigSeed, error) {
 
 	var config Config
 
-	// Unmarshal the configuration file into the Config structure
-	if err := viper.Unmarshal(&config); err != nil {
-		return nil, fmt.Errorf("error unmarshalling config: %s", err)
+	file, err := os.Open("../../config/config.txt")
+	if err != nil {
+		return nil, fmt.Errorf("error opening config file: %s", err)
+	}
+	defer file.Close()
+
+	// Create a new scanner to read the file
+	scanner := bufio.NewScanner(file)
+
+	// Read the file line by line
+	for scanner.Scan() {
+		line := scanner.Text()
+		// Split the line into IP and port
+		ipPort := strings.Split(line, ":")
+		ip := ipPort[0]
+		port, err := strconv.Atoi(ipPort[1])
+
+		if err != nil {
+			return nil, fmt.Errorf("error converting port to int: %s", err)
+		}
+
+		// Add the seed node to the list
+		config.Seeds = append(config.Seeds, models.ConfigSeed{IP: ip, Port: port})
 	}
 
 	return config.Seeds, nil
 }
 
-// func printSeedNodes(seedNodes []models.ConfigSeed) {
-// 	for _, seed := range seedNodes {
-// 		fmt.Printf("IP: %s, Port: %d \n", seed.IP, seed.Port)
-// 	}
-// }
-
 func getSeedNodes() ([]models.ConfigSeed, error) {
-	// Initialize Viper for config file
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml") 
-	viper.AddConfigPath("../../config")   
-
-	if err := viper.ReadInConfig(); err != nil {
-		log.Fatalf("Error reading config file: %s", err)
+	// Parse the seed nodes from the configuration file
+	seedNodes, err := parseSeedNodes()
+	if err != nil {
+		return nil, fmt.Errorf("error parsing seed nodes: %s", err)
 	}
 
-	type Config struct{
-		Seeds []models.ConfigSeed
-	}
-
-	var config Config
-
-	// Unmarshal the configuration file into the Config structure
-	if err := viper.Unmarshal(&config); err != nil {
-		return nil, fmt.Errorf("error unmarshalling config: %s", err)
-	}
-
-	return config.Seeds, nil
+	return seedNodes, nil
 }
 
 func callTCPServer(seedNodes []models.ConfigSeed){

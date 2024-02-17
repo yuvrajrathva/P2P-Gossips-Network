@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"sync"
+	"os"
 
 	"github.com/yuvrajrathva/P2P-Gossips-Network/models"
 )
@@ -135,7 +136,15 @@ func connectToPeersServer(peers []models.Peer) {
 // }
 
 func printPeerNodes(peerNodes []models.Peer) {
+	outputfile, err := os.OpenFile("../../outputfile.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Println("Error opening output file: ", err.Error())
+		return
+	}
+	defer outputfile.Close()
+
 	for _, peer := range peerNodes {
 		fmt.Printf("Selected Peer IP: %s, Port: %d\n", peer.IP, peer.Port)
+		outputfile.WriteString(fmt.Sprintf("Selected Peer IP: %s, Port: %d\n", peer.IP, peer.Port))
 	}
 }

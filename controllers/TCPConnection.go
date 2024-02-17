@@ -3,6 +3,7 @@ package controllers
 import (
 	"fmt"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -127,20 +128,21 @@ func requestingPeerList(ip string, port int, peerList *[]models.Peer) {
 
 func handleSeedServerConnection(conn net.Conn, peerList *[]models.Peer) {
 	defer conn.Close()
-
 	buffer := make([]byte, 1024)
-
 	n, err := conn.Read(buffer)
-
 	if err != nil {
 		fmt.Println("Error while reading: ", err.Error())
 		return
 	}
 
+	outputfile, err := os.OpenFile("../../outputfile.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Println("Error opening output file: ", err.Error())
+		return
+	}
+	defer outputfile.Close()
+
 	if string(buffer[:n]) == "peerList\n" {
-		// send peer list
-		// fmt.Printf("I m inside peerList request");
-		// fmt.Printf("Peer List: %v\n", peerList)
 		_, err = conn.Write([]byte(peerListToString(peerList)))
 		if err != nil {
 			fmt.Println("Error while sending peer list: ", err.Error())
@@ -153,14 +155,12 @@ func handleSeedServerConnection(conn net.Conn, peerList *[]models.Peer) {
 		for i, peer := range *peerList {
 			if peer.IP == deadIP && peer.Port == deadPort {
 				*peerList = append((*peerList)[:i], (*peerList)[i+1:]...)
-				fmt.Printf("Dead Node: %s:%d:%s:%s\n", deadIP, deadPort, time.Now().String(), conn.LocalAddr().(*net.TCPAddr).IP.String())
+
+				fmt.Printf("Dead Node: %s:%d:%s:%s\n", deadIP, deadPort, time.Now().String(), conn.LocalAddr().(*net.TCPAddr).IP.String()+":"+strconv.Itoa(conn.LocalAddr().(*net.TCPAddr).Port))
+
+				outputfile.WriteString(fmt.Sprintf("Dead Node: %s:%d:%s:%s\n", deadIP, deadPort, time.Now().String(), conn.LocalAddr().(*net.TCPAddr).IP.String()+":"+strconv.Itoa(conn.LocalAddr().(*net.TCPAddr).Port)))
 				break
 			}
-		}
-		_, err = conn.Write([]byte("inValidRequest"))
-		if err != nil {
-			fmt.Println("Error while sending invalid request message: ", err.Error())
-			return
 		}
 	} else {
 		peer := stringToArray(string(buffer[:n]), ":")
@@ -171,7 +171,10 @@ func handleSeedServerConnection(conn net.Conn, peerList *[]models.Peer) {
 			return
 		}
 		*peerList = append(*peerList, models.Peer{IP: ip, Port: port})
+
 		fmt.Printf("Peer added - IP: %s, Port: %d to Seed: %s \n", ip, port, conn.LocalAddr().(*net.TCPAddr))
+
+		outputfile.WriteString(fmt.Sprintf("Peer added - IP: %s, Port: %d to Seed: %s \n", ip, port, conn.LocalAddr().(*net.TCPAddr).IP.String()+":"+strconv.Itoa(conn.LocalAddr().(*net.TCPAddr).Port)))
 	}
 }
 
@@ -201,18 +204,6 @@ func stringToPeerList(str string) []models.Peer {
 func stringToArray(str string, sep string) []string {
 	return strings.Split(str, sep)
 }
-
-// func getPeerListFromSeeds() {
-// 	seedNodeList, err := getSeedNodes()
-// 	if err != nil {
-// 		fmt.Printf("Error getting seed nodes: %s\n", err)
-// 		return
-// 	}
-
-// 	for _, seed := range seedNodeList {
-// 		requestingPeerList(seed.IP, seed.Port, &seed.PeerList)
-// 	}
-// }
 
 func handlePeerServerConnection(conn net.Conn, ip string) {
 	defer conn.Close()
@@ -245,7 +236,7 @@ func PeerLivelinessChecker(selfIP string, selfPort int, ip string, port int, wg 
 			removePeerFromSeedNodes(selfIP, selfPort, ip, port, peerList)
 		}
 
-		fmt.Printf("Error connecting to peer - IP: %s, Port: %d, Missed Pings: %d, Error: %s\n", ip, port, *missedPings, err)
+		// fmt.Printf("Error connecting to peer - IP: %s, Port: %d, Missed Pings: %d, Error: %s\n", ip, port, *missedPings, err)
 		removePeerFromSeedNodes(selfIP, selfPort, ip, port, peerList)
 	} else {
 		defer conn.Close()
@@ -295,23 +286,21 @@ func removePeerFromSeedNodes(selfIP string, selfPort int, ip string, port int, p
 			fmt.Println("Error while sending remove peer message:", err)
 			return
 		}
-
-		buffer := make([]byte, 1024)
-
-		n, err := conn.Read(buffer)
-		if err != nil {
-			fmt.Println("Error while reading remove peer message:", err)
-			return
-		}
-
-		if string(buffer[:n]) != "inValidRequest" {
-			fmt.Printf("Dead Node: %s:%d:%s:%s\n", ip, port, time.Now().String(), selfIP)
-		}
 	}
+	
+	outputfile, err := os.OpenFile("../../outputfile.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Println("Error opening output file: ", err.Error())
+		return
+	}
+	defer outputfile.Close()
 
 	for i, peer := range *peerList {
 		if peer.IP == ip && peer.Port == port {
 			*peerList = append((*peerList)[:i], (*peerList)[i+1:]...)
+			fmt.Printf("Dead Node: %s:%d:%s:%s\n", ip, port, time.Now().String(), selfIP+":"+strconv.Itoa(selfPort))
+
+			outputfile.WriteString(fmt.Sprintf("Dead Node: %s:%d:%s:%s\n", ip, port, time.Now().String(), selfIP+":"+strconv.Itoa(selfPort)))
 			break
 		}
 	}
