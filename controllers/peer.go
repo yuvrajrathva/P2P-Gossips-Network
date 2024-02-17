@@ -24,10 +24,7 @@ func CreatePeer(ip string, port int) {
 	fmt.Println("Number of total Seed Nodes:", len(seedNodeList))
 
 	selectedSeedNodes := selectSeedNodes(seedNodeList) // select n/2 + 1 seed nodes
-	// fmt.Println("List of Seed Nodes for this Peer:")
-	// printSeedNodes(selectedSeedNodes)
 
-	// var selectedPeers []models.Peer
 	selectedPeersList := selectPeersList(selectedSeedNodes) // select all peers from selected seed nodes
 	selectedPeers := selectPeers(selectedPeersList)         // select 4 peers from selected peers list
 	printPeerNodes(selectedPeers)
@@ -39,7 +36,7 @@ func CreatePeer(ip string, port int) {
 	addPeerToSeedNodes(selectedSeedNodes, peer) // add this peer to Peer List of selected seed nodes
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go PeerTCPServer(ip, port, &wg, &selectedPeers) // start server
+	go PeerTCPServer(ip, port, &wg, &selectedPeers) // start peer server
 	wg.Wait()
 	fmt.Printf("Peer created - IP: %s, Port: %d\n", peer.IP, peer.Port)
 }
@@ -100,6 +97,7 @@ func selectPeers(peers []models.Peer) []models.Peer {
 		peers[i], peers[j] = peers[j], peers[i]
 	})
 
+	// select 4 peers
 	for i := 0; i < 4; i++ {
 		selectedPeers[i] = peers[i]
 	}
@@ -109,31 +107,16 @@ func selectPeers(peers []models.Peer) []models.Peer {
 
 func addPeerToSeedNodes(seedNodes []models.ConfigSeed, peer *models.Peer) {
 	for _, seed := range seedNodes {
-		PeerTCPClient(seed.IP, seed.Port, peer)
+		PeerTCPClient(seed.IP, seed.Port, peer) // add peer to seed node
 	}
 }
-
-// func startServer(peers []models.Peer) {
-// 	var wg sync.WaitGroup
-// 	wg.Add(len(peers))
-// 	for _, p := range peers {
-// 		go PeerTCPServer(p.IP, p.Port, &wg)
-// 	}
-// 	wg.Wait()
-// }
 
 func connectToPeersServer(peers []models.Peer) {
 	for _, p := range peers {
 		fmt.Printf("Connecting... to peer - %s:%d\n", p.IP, p.Port)
-		go TCPClient(p.IP, p.Port)
+		go TCPClient(p.IP, p.Port) // connect to peer
 	}
 }
-
-// func printPeerNodes(peerNodes []models.Peer) {
-// 	for _, peer := range peerNodes {
-// 		fmt.Printf("IP: %s, Port: %d, Peer List: %v\n", peer.IP, peer.Port)
-// 	}
-// }
 
 func printPeerNodes(peerNodes []models.Peer) {
 	outputfile, err := os.OpenFile("../../outputfile.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
