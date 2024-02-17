@@ -25,7 +25,7 @@ func CreateSeed() {
 		log.Fatalf("Error parsing seed nodes: %s", err)
 	}
 
-	callTCPServer(seedNodes)
+	callTCPServer(seedNodes)  // start seed nodes as server
 }
 
 func parseSeedNodes() ([]models.ConfigSeed, error) {
@@ -78,7 +78,7 @@ func callTCPServer(seedNodes []models.ConfigSeed){
 	wg.Add(len(seedNodes))
 	fmt.Println("Starting Seed Nodes as Server")
 	for _, seed := range seedNodes {
-		go SeedTCPServer(seed.IP, seed.Port, &wg, &seed.PeerList)
+		go SeedTCPServer(seed.IP, seed.Port, &wg, &seed.PeerList) // start seed nodes as server
 	}
 	wg.Wait()
 }

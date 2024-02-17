@@ -13,7 +13,7 @@ import (
 	"github.com/yuvrajrathva/P2P-Gossips-Network/models"
 )
 
-func TCPClient(ip string, port int) {
+func TCPClient(ip string, port int) { // connect to peer server
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", ip, port))
 	if err != nil {
 		fmt.Printf("Error connecting to peer - IP: %s, Port: %d, Error: %s\n", ip, port, err)
@@ -24,7 +24,7 @@ func TCPClient(ip string, port int) {
 	fmt.Printf("Connected to peer - IP: %s, Port: %d\n", ip, port)
 }
 
-func PeerTCPClient(ip string, port int, peer *models.Peer) {
+func PeerTCPClient(ip string, port int, peer *models.Peer) { // connect to seed server and send this peer details to register
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", ip, port))
 	if err != nil {
 		fmt.Printf("Error connecting to seed - IP: %s, Port: %d, Error: %s\n", ip, port, err)
@@ -39,7 +39,7 @@ func PeerTCPClient(ip string, port int, peer *models.Peer) {
 	}
 }
 
-func SeedTCPServer(ip string, port int, wg *sync.WaitGroup, peerList *[]models.Peer) {
+func SeedTCPServer(ip string, port int, wg *sync.WaitGroup, peerList *[]models.Peer) { // start seed server
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", ip, port))
 	if err != nil {
 		fmt.Printf("Error starting seed server - IP: %s, Port: %d, Error: %s\n", ip, port, err)
@@ -74,6 +74,7 @@ func PeerTCPServer(ip string, port int, wg *sync.WaitGroup, peerList *[]models.P
 
 	fmt.Printf("Server started - IP: %s, Port: %d\n", ip, port)
 
+	// this go routine will check liveness of all peers in peerList
 	go func() {
 		for {
 			var wg sync.WaitGroup
@@ -82,19 +83,19 @@ func PeerTCPServer(ip string, port int, wg *sync.WaitGroup, peerList *[]models.P
 				go PeerLivelinessChecker(ip, port, peer.IP, peer.Port, &wg, &peer.MissedPings, peerList)
 			}
 			wg.Wait()
-			time.Sleep(13 * time.Second)
+			time.Sleep(13 * time.Second) // check liveness of all peers in peerList after every 13 seconds
 		}
 	}()
 
+	// this go routine will send gossip message to all peers in peerList
 	go func() {
-		// 	Every gossip message received the first time should be displayed on the console as well as written to the output file along with a local timestamp and the IP address of the node from which it received the message.
 		var wg sync.WaitGroup
 		for _, peer := range *peerList {
 			wg.Add(1)
 			go GossipMessage(peer.IP, peer.Port, ip, port, &wg)
 		}
 		wg.Wait()
-		time.Sleep(5 * time.Second)
+		time.Sleep(5 * time.Second) // send gossip message to all peers in peerList after every 5 seconds
 	}()
 
 	for {
@@ -111,7 +112,7 @@ func PeerTCPServer(ip string, port int, wg *sync.WaitGroup, peerList *[]models.P
 	}
 }
 
-func requestingPeerList(ip string, port int, peerList *[]models.Peer) {
+func requestingPeerList(ip string, port int, peerList *[]models.Peer) { // request for peer list from seed server
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", ip, port))
 	if err != nil {
 		fmt.Printf("Error connecting to seed server - IP: %s, Port: %d, Error: %s\n", ip, port, err)
@@ -133,9 +134,7 @@ func requestingPeerList(ip string, port int, peerList *[]models.Peer) {
 		return
 	}
 
-	*peerList = stringToPeerList(string(buffer[:n]))
-
-	// fmt.Printf("Peer List from Seed server %s:%d is %v\n", ip, port, *peerList)
+	*peerList = stringToPeerList(string(buffer[:n])) // update peer list
 }
 
 func handleSeedServerConnection(conn net.Conn, peerList *[]models.Peer) {
@@ -154,13 +153,13 @@ func handleSeedServerConnection(conn net.Conn, peerList *[]models.Peer) {
 	}
 	defer outputfile.Close()
 
-	if string(buffer[:n]) == "peerList\n" {
+	if string(buffer[:n]) == "peerList\n" { // send peer list to peer
 		_, err = conn.Write([]byte(peerListToString(peerList)))
 		if err != nil {
 			fmt.Println("Error while sending peer list: ", err.Error())
 			return
 		}
-	} else if stringToArray(string(buffer[:n]), ":")[0] == "removePeer" {
+	} else if stringToArray(string(buffer[:n]), ":")[0] == "removePeer" { // remove peer from peer list
 		deadIP := stringToArray(string(buffer[:n]), ":")[1]
 		deadPort, _ := strconv.Atoi(stringToArray(string(buffer[:n]), ":")[2])
 
@@ -174,7 +173,7 @@ func handleSeedServerConnection(conn net.Conn, peerList *[]models.Peer) {
 				break
 			}
 		}
-	} else {
+	} else { // add peer to peer list
 		peer := stringToArray(string(buffer[:n]), ":")
 		ip := peer[0]
 		port, err := strconv.Atoi(peer[1])
@@ -190,7 +189,7 @@ func handleSeedServerConnection(conn net.Conn, peerList *[]models.Peer) {
 	}
 }
 
-func peerListToString(peerList *[]models.Peer) string {
+func peerListToString(peerList *[]models.Peer) string { // convert peer list to string
 	var str string
 	for _, peer := range *peerList {
 		str += fmt.Sprintf("IP: %s, Port: %d\n", peer.IP, peer.Port)
@@ -198,7 +197,7 @@ func peerListToString(peerList *[]models.Peer) string {
 	return str
 }
 
-func stringToPeerList(str string) []models.Peer {
+func stringToPeerList(str string) []models.Peer {  // convert string to peer list
 	var peerList []models.Peer
 	peerListStr := string(str)
 	peerListStr = peerListStr[:len(peerListStr)-1]
@@ -213,7 +212,7 @@ func stringToPeerList(str string) []models.Peer {
 	return peerList
 }
 
-func stringToArray(str string, sep string) []string {
+func stringToArray(str string, sep string) []string { // convert string to array using separator
 	return strings.Split(str, sep)
 }
 
@@ -228,8 +227,7 @@ func handlePeerServerConnection(conn net.Conn, ip string) {
 		return
 	}
 
-	if stringToArray(string(buffer[:n]), " : ")[0] == "GossipMessage" {
-		// Every gossip message received the first time should be displayed on the console as well as written to the output file along with a local timestamp and the IP address of the node from which it received the message.
+	if stringToArray(string(buffer[:n]), " : ")[0] == "GossipMessage" { // handle gossip message
 		messageTimeStamp := stringToArray(string(buffer[:n]), " : ")[1]
 		senderIP := stringToArray(string(buffer[:n]), " : ")[2]
 		senderPort:=stringToArray(string(buffer[:n]), " : ")[3]
@@ -243,7 +241,7 @@ func handlePeerServerConnection(conn net.Conn, ip string) {
 		defer outputfile.Close()
 		fmt.Printf("Gossip Message Received: %s : %s : %s\n", messageTimeStamp, senderIP+":"+senderPort, messageHash)
 		outputfile.WriteString(fmt.Sprintf("Gossip Message Received: %s : %s : %s\n", messageTimeStamp, senderIP+":"+senderPort, messageHash))
-	} else {
+	} else { // handle liveness message
 		senderTimestamp := stringToArray(string(buffer[:n]), ":")[1]
 		senderIP := stringToArray(string(buffer[:n]), ":")[2]
 
@@ -256,18 +254,17 @@ func handlePeerServerConnection(conn net.Conn, ip string) {
 }
 
 func PeerLivelinessChecker(selfIP string, selfPort int, ip string, port int, wg *sync.WaitGroup, missedPings *int, peerList *[]models.Peer) {
-	// detect dead peers and remove that peer node from seed if missedPings >= 3
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", ip, port))
 	if err != nil {
 		*missedPings = *missedPings + 1
-		if *missedPings >= 3 {
+		if *missedPings >= 3 { // remove peer from seed if missedPings >= 3
 			fmt.Printf("Peer is dead - IP: %s, Port: %d\n", ip, port)
 			removePeerFromSeedNodes(selfIP, selfPort, ip, port, peerList)
 		}
 
 		// fmt.Printf("Error connecting to peer - IP: %s, Port: %d, Missed Pings: %d, Error: %s\n", ip, port, *missedPings, err)
 		removePeerFromSeedNodes(selfIP, selfPort, ip, port, peerList)
-	} else {
+	} else { // send liveness message to peers
 		defer conn.Close()
 
 		_, err = conn.Write([]byte("LivenessMessage:" + time.Now().String() + ":" + selfIP))
@@ -295,7 +292,7 @@ func PeerLivelinessChecker(selfIP string, selfPort int, ip string, port int, wg 
 	defer wg.Done()
 }
 
-func removePeerFromSeedNodes(selfIP string, selfPort int, ip string, port int, peerList *[]models.Peer) {
+func removePeerFromSeedNodes(selfIP string, selfPort int, ip string, port int, peerList *[]models.Peer) { // remove dead peer from seed nodes
 	seedNodeList, err := getSeedNodes()
 	if err != nil {
 		fmt.Printf("Error getting seed nodes: %s\n", err)
@@ -324,6 +321,7 @@ func removePeerFromSeedNodes(selfIP string, selfPort int, ip string, port int, p
 	}
 	defer outputfile.Close()
 
+	// remove dead peer from peer list
 	for i, peer := range *peerList {
 		if peer.IP == ip && peer.Port == port {
 			*peerList = append((*peerList)[:i], (*peerList)[i+1:]...)
@@ -335,7 +333,7 @@ func removePeerFromSeedNodes(selfIP string, selfPort int, ip string, port int, p
 	}
 }
 
-func GossipMessage(peerIP string, peerPort int, selfIP string, selfPort int, wg *sync.WaitGroup) {
+func GossipMessage(peerIP string, peerPort int, selfIP string, selfPort int, wg *sync.WaitGroup) { // send gossip message to peers
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", peerIP, peerPort))
 	if err != nil {
 		fmt.Printf("Error connecting to peer for gossip message- IP: %s, Port: %d, Error: %s\n", peerIP, peerPort, err)
@@ -348,6 +346,7 @@ func GossipMessage(peerIP string, peerPort int, selfIP string, selfPort int, wg 
 	hash.Write([]byte(Message))
 	hashedMessage := hash.Sum(nil)
 
+	// send gossip message to peers
 	_, err = conn.Write([]byte("GossipMessage : " + time.Now().String() + " : " + selfIP + " : " + strconv.Itoa(selfPort) + " : " + string(hashedMessage)))
 	if err != nil {
 		fmt.Println("Error while sending gossip message:", err)
